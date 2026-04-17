@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seto-backends
+  namespace: seto
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - admin
+          - hr
+          - scm
+          - kms
+          - batch
+  namespaceSelector:
+    matchNames:
+      - seto
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s

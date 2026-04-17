@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch
+  namespace: seto
+  labels:
+    app: batch
+spec:
+  replicas: 1    # Single replica to prevent duplicate batch job execution
+  selector:
+    matchLabels:
+      app: batch
+  template:
+    metadata:
+      labels:
+        app: batch
+    spec:
+      serviceAccountName: seto-kafka-sa
+      containers:
+        - name: batch
+          image: 481961345072.dkr.ecr.ap-northeast-2.amazonaws.com/seto/backend-batch:latest
+          ports:
+            - containerPort: 8084
+          env:
+            # --- Timezone ---
+            - name: TZ
+              value: "Asia/Seoul"
+            # --- Database (from Secrets Manager) ---
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: driver
+            # --- JWT (from Secrets Manager) ---
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jwt-secret
+            # --- HikariCP (higher pool for batch workloads) ---
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              value: "5"
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              value: "2"
+            - name: SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT
+              value: "30000"
+            - name: SPRING_DATASOURCE_HIKARI_MAX_LIFETIME
+              value: "60000"
+            - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+              value: "30000"
+            # --- Kafka MSK IAM ---
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "boot-4olzfnvs.c2.kafka-serverless.ap-northeast-2.amazonaws.com:9098"
+            - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+              value: "AWS_MSK_IAM"
+            - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+              value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+            - name: SPRING_KAFKA_PROPERTIES_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+              value: "software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+            # --- GCP / NLP ---
+            - name: NLP_GOOGLE_CREDENTIALS_LOCATION
+              value: "file:/secrets/gcp/gcp-key.json"
+            # --- Batch Scheduler ---
+            - name: BATCH_SCHEDULE_ENABLED
+              value: "true"
+            - name: BATCH_SCHEDULE_ZONE
+              value: "Asia/Seoul"
+            - name: BATCH_SCHEDULE_QUANTITATIVE_PERIOD_TYPE
+              value: "MONTH"
+            - name: BATCH_SCHEDULE_QUANTITATIVE_CRON
+              value: "0 0 1 * * *"
+            - name: BATCH_SCHEDULE_QUALITATIVE_NORMALIZATION_CRON
+              value: "0 15 1 1 * *"
+            - name: BATCH_SCHEDULE_SCORE_CRON
+              value: "0 30 1 * * *"
+            - name: BATCH_SCHEDULE_PROMOTION_CRON
+              value: "0 0 2 * * *"
+          volumeMounts:
+            - name: gcp-key
+              mountPath: /secrets/gcp
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8084
+            initialDelaySeconds: 60
+            periodSeconds: 15
+      volumes:
+        - name: gcp-key
+          secret:
+            secretName: gcp-key
