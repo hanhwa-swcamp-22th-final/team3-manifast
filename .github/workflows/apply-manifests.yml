@@ -52,7 +52,6 @@ jobs:
       - name: Apply application manifests
         run: |
           kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/rbac/
           kubectl apply -f k8s/service-accounts.yaml
           kubectl apply -f k8s/secrets/
           kubectl apply -f k8s/ingress-class-params.yaml

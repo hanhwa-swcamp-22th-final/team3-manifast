@@ -2,6 +2,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: seto-github-deploy
+  annotations:
+    seto.io/apply-mode: "manual-bootstrap"
+    seto.io/description: "Apply this with an admin identity, not from the GitHub deploy workflow."
 rules:
   - apiGroups: [""]
     resources:
