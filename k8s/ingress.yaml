@@ -1,0 +1,90 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: seto-ingress
+  namespace: seto
+  annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443},{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+    alb.ingress.kubernetes.io/security-groups: sg-00ce66e262180bf9b
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          # Admin service routes
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          - path: /api/v1/organization
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          - path: /api/v1/equipment-management
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          - path: /api/v1/domain-keyword
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          - path: /api/v1/industry
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          - path: /api/v1/algorithm-version
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  number: 8080
+          # HR service
+          - path: /api/v1/hr
+            pathType: Prefix
+            backend:
+              service:
+                name: hr
+                port:
+                  number: 8081
+          # SCM service
+          - path: /api/v1/scm
+            pathType: Prefix
+            backend:
+              service:
+                name: scm
+                port:
+                  number: 8082
+          # KMS service
+          - path: /api/kms
+            pathType: Prefix
+            backend:
+              service:
+                name: kms
+                port:
+                  number: 8083
+          # Batch service
+          - path: /api/v1/batch
+            pathType: Prefix
+            backend:
+              service:
+                name: batch
+                port:
+                  number: 8084

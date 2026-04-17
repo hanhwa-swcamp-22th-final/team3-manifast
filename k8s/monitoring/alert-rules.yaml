@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: seto-alerts
+  namespace: seto
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: seto.rules
+      rules:
+        - alert: HighCPUUsage
+          expr: rate(process_cpu_usage{namespace="seto"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on {{ $labels.pod }}"
+            description: "CPU usage is above 80% for 5 minutes."
+
+        - alert: HighMemoryUsage
+          expr: jvm_memory_used_bytes{namespace="seto"} / jvm_memory_max_bytes{namespace="seto"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on {{ $labels.pod }}"
+            description: "JVM memory usage is above 85% for 5 minutes."
+
+        - alert: PodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="seto"}[1h]) > 3
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} restarting frequently"
+            description: "Pod has restarted more than 3 times in the last hour."
+
+        - alert: High5xxRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="seto", status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{namespace="seto"}[5m]))
+            > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High 5xx error rate in SETO namespace"
+            description: "More than 5% of requests are returning 5xx errors."

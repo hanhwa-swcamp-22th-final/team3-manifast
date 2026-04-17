@@ -1,0 +1,8 @@
+apiVersion: eks.amazonaws.com/v1
+kind: IngressClassParams
+metadata:
+  name: alb
+spec:
+  scheme: internet-facing
+  certificateARNs:
+    - arn:aws:acm:ap-northeast-2:481961345072:certificate/fef2f113-3feb-4d14-bc15-fbe69e6f5bf4

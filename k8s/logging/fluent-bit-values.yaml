@@ -1,0 +1,52 @@
+# Helm values for fluent-bit chart
+# Install: helm install fluent-bit fluent/fluent-bit -n seto -f fluent-bit-values.yaml
+
+config:
+  inputs: |
+    [INPUT]
+        Name              tail
+        Tag               backend.*
+        Path              /var/log/containers/admin-*.log,/var/log/containers/hr-*.log,/var/log/containers/scm-*.log,/var/log/containers/kms-*.log,/var/log/containers/batch-*.log
+        Parser            docker
+        Refresh_Interval  10
+        Mem_Buf_Limit     5MB
+
+  filters: |
+    [FILTER]
+        Name          kubernetes
+        Match         backend.*
+        Merge_Log     On
+        Keep_Log      Off
+        K8S-Logging.Parser  On
+
+  outputs: |
+    [OUTPUT]
+        Name            es
+        Match           backend.*
+        Host            seto-es-es-http.seto.svc.cluster.local
+        Port            9200
+        Logstash_Format On
+        Logstash_Prefix seto-backend
+        tls             On
+        tls.verify      Off
+        HTTP_User       elastic
+        HTTP_Passwd     ${ELASTIC_PASSWORD}
+        Suppress_Type_Name On
+
+env:
+  - name: ELASTIC_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: seto-es-es-elastic-user
+        key: elastic
+
+tolerations:
+  - operator: Exists
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
