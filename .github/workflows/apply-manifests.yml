@@ -1,0 +1,77 @@
+name: Apply Kubernetes Manifests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate YAML parses
+        run: |
+          python3 -m pip install pyyaml
+          python3 - <<'PY'
+          import pathlib, yaml
+          for path in pathlib.Path("k8s").rglob("*.yaml"):
+              list(yaml.safe_load_all(path.read_text()))
+              print(path)
+          PY
+
+  apply:
+    if: github.event_name == 'push'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name "${EKS_CLUSTER_NAME}" \
+            --region "${AWS_REGION}"
+
+      - name: Apply application manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/service-accounts.yaml
+          kubectl apply -f k8s/secrets/
+          kubectl apply -f k8s/ingress-class-params.yaml
+          kubectl apply -f k8s/ingress-class.yaml
+          kubectl apply -f k8s/admin/
+          kubectl apply -f k8s/hr/
+          kubectl apply -f k8s/scm/
+          kubectl apply -f k8s/kms/
+          kubectl apply -f k8s/batch/
+          kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/monitoring/
+          kubectl apply -f k8s/logging/storageclass.yaml
+          kubectl apply -f k8s/logging/elasticsearch.yaml
+          kubectl apply -f k8s/logging/kibana.yaml
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/admin -n seto --timeout=300s
+          kubectl rollout status deployment/hr -n seto --timeout=300s
+          kubectl rollout status deployment/scm -n seto --timeout=300s
+          kubectl rollout status deployment/kms -n seto --timeout=300s
+          kubectl rollout status deployment/batch -n seto --timeout=300s
+          kubectl get ingress,svc,deploy -n seto
